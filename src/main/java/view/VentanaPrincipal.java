@@ -1,4 +1,5 @@
 package view;
+
 import dao.LibroDAO;
 import model.Libro;
 import model.Socio;
@@ -9,42 +10,54 @@ import java.awt.*;
 import java.util.List;
 
 public class VentanaPrincipal extends JFrame {
+    // Instancias de acceso a datos (DAO)
     private LibroDAO libroDAO = new LibroDAO();
+    private dao.SocioDAO socioDAO = new dao.SocioDAO();
+    private dao.PrestamoDAO prestamoDAO = new dao.PrestamoDAO();
+
+    // Componentes de la tabla de Libros
     private JTable tablaLibros;
     private DefaultTableModel modeloTabla;
-    private dao.SocioDAO socioDAO = new dao.SocioDAO();
+
+    // Componentes de la tabla de Socios
     private JTable tablaSocios;
     private DefaultTableModel modeloTablaSocios;
+
+    // Componentes de la tabla de Préstamos
     private JTable tablaPrestamos;
     private DefaultTableModel modeloTablaPrestamos;
-    private dao.PrestamoDAO prestamoDAO = new dao.PrestamoDAO();
 
     public VentanaPrincipal() {
         setTitle("Sistema de Gestión de Biblioteca");
-        setSize(800, 600);
+        setSize(850, 650);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
         JTabbedPane pestañas = new JTabbedPane();
 
-        // Panel de Libros
+        // Agregar las tres pestañas principales de la aplicación
         pestañas.addTab("Inventario de Libros", crearPanelLibros());
-        // Panel de Socios
         pestañas.addTab("Gestión de Socios", crearPanelSocios());
-        // Panel de Préstamos (puedes expandirlo de forma similar)
         pestañas.addTab("Préstamos y Devoluciones", crearPanelPrestamos());
 
         add(pestañas);
+
+        // Forzar la carga inicial de datos desde MySQL a las tablas de la interfaz
         actualizarTabla();
         actualizarTablaSocios();
         actualizarTablaPrestamos();
     }
 
+    /**
+     * PESTAÑA 1: INVENTARIO DE LIBROS
+     */
     private JPanel crearPanelLibros() {
         JPanel panel = new JPanel(new BorderLayout());
 
-        // Formulario superior para añadir
+        // Formulario superior para añadir libros
         JPanel panelFormulario = new JPanel(new GridLayout(4, 2, 5, 5));
+        panelFormulario.setBorder(BorderFactory.createTitledBorder("Registrar Nuevo Libro"));
+        
         JTextField txtTitulo = new JTextField();
         JTextField txtAutor = new JTextField();
         JTextField txtIsbn = new JTextField();
@@ -55,7 +68,7 @@ public class VentanaPrincipal extends JFrame {
         panelFormulario.add(new JLabel(" ISBN:")); panelFormulario.add(txtIsbn);
         panelFormulario.add(new JLabel("")); panelFormulario.add(btnAgregar);
 
-        // Tabla central
+        // Tabla central de libros
         modeloTabla = new DefaultTableModel(new String[]{"ID", "Título", "Autor", "ISBN", "Disponible"}, 0);
         tablaLibros = new JTable(modeloTabla);
         JScrollPane scrollTabla = new JScrollPane(tablaLibros);
@@ -63,11 +76,11 @@ public class VentanaPrincipal extends JFrame {
         panel.add(panelFormulario, BorderLayout.NORTH);
         panel.add(scrollTabla, BorderLayout.CENTER);
 
-        // Evento del botón
+        // Evento para añadir libros con validación básica de campos vacíos
         btnAgregar.addActionListener(e -> {
-            String titulo = txtTitulo.getText();
-            String autor = txtAutor.getText();
-            String isbn = txtIsbn.getText();
+            String titulo = txtTitulo.getText().trim();
+            String autor = txtAutor.getText().trim();
+            String isbn = txtIsbn.getText().trim();
             
             if(!titulo.isEmpty() && !autor.isEmpty() && !isbn.isEmpty()) {
                 Libro nuevoLibro = new Libro(0, titulo, autor, isbn, 1);
@@ -76,101 +89,19 @@ public class VentanaPrincipal extends JFrame {
                     actualizarTabla();
                     txtTitulo.setText(""); txtAutor.setText(""); txtIsbn.setText("");
                 } else {
-                    JOptionPane.showMessageDialog(this, "Error al agregar el libro.");
+                    JOptionPane.showMessageDialog(this, "Error al agregar el libro en la base de datos.");
                 }
             } else {
-                JOptionPane.showMessageDialog(this, "Por favor, llene todos los campos.");
+                JOptionPane.showMessageDialog(this, "Por favor, llene todos los campos del formulario.");
             }
         });
 
         return panel;
     }
 
-    private JPanel crearPanelPrestamos() {
-        JPanel panel = new JPanel(new BorderLayout());
-
-        // Formulario de Préstamos (Superior)
-        JPanel panelFormulario = new JPanel(new GridLayout(4, 2, 5, 5));
-        panelFormulario.setBorder(BorderFactory.createTitledBorder("Registrar Préstamo / Devolución"));
-        
-        JTextField txtIdLibro = new JTextField();
-        JTextField txtIdSocio = new JTextField();
-        JTextField txtIdPrestamoDevolucion = new JTextField();
-        
-        JButton btnPrestar = new JButton("Registrar Préstamo");
-        JButton btnDevolver = new JButton("Registrar Devolución");
-
-        panelFormulario.add(new JLabel(" ID Libro (para prestar):")); panelFormulario.add(txtIdLibro);
-        panelFormulario.add(new JLabel(" ID Socio (para prestar):")); panelFormulario.add(txtIdSocio);
-        panelFormulario.add(new JLabel(" ID Préstamo (solo para devolución):")); panelFormulario.add(txtIdPrestamoDevolucion);
-        panelFormulario.add(btnPrestar); panelFormulario.add(btnDevolver);
-
-        // Tabla de Préstamos Activos (Inferior)
-        JPanel panelTabla = new JPanel(new BorderLayout());
-        panelTabla.setBorder(BorderFactory.createTitledBorder("Libros actualmente prestados"));
-        
-        modeloTablaPrestamos = new DefaultTableModel(new String[]{"ID Préstamo", "Libro", "Socio", "Fecha Préstamo"}, 0);
-        tablaPrestamos = new JTable(modeloTablaPrestamos);
-        JScrollPane scrollTabla = new JScrollPane(tablaPrestamos);
-        panelTabla.add(scrollTabla, BorderLayout.CENTER);
-
-        // Unimos los componentes en el panel principal
-        panel.add(panelFormulario, BorderLayout.NORTH);
-        panel.add(panelTabla, BorderLayout.CENTER);
-
-        // Evento del botón Prestar
-        btnPrestar.addActionListener(e -> {
-            try {
-                int idLibro = Integer.parseInt(txtIdLibro.getText().trim());
-                int idSocio = Integer.parseInt(txtIdSocio.getText().trim());
-                
-                if (prestamoDAO.registrarPrestamo(idLibro, idSocio)) {
-                    JOptionPane.showMessageDialog(this, "¡Préstamo registrado con éxito!");
-                    actualizarTabla(); // Actualiza inventario de libros
-                    actualizarTablaPrestamos(); // Actualiza esta tabla
-                    txtIdLibro.setText(""); txtIdSocio.setText("");
-                } else {
-                    JOptionPane.showMessageDialog(this, "No se pudo realizar el préstamo. Verifica el stock del libro.");
-                }
-            } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(this, "Por favor, ingresa IDs numéricos válidos.");
-            }
-        });
-
-        // Evento del botón Devolver
-        btnDevolver.addActionListener(e -> {
-            try {
-                int idPrestamo = Integer.parseInt(txtIdPrestamoDevolucion.getText().trim());
-                int idLibro = Integer.parseInt(txtIdLibro.getText().trim()); 
-                
-                if (prestamoDAO.registrarDevolucion(idPrestamo, idLibro)) {
-                    JOptionPane.showMessageDialog(this, "¡Devolución registrada con éxito!");
-                    actualizarTabla(); 
-                    actualizarTablaPrestamos(); 
-                    txtIdPrestamoDevolucion.setText(""); txtIdLibro.setText("");
-                } else {
-                    JOptionPane.showMessageDialog(this, "Error al registrar la devolución.");
-                }
-            } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(this, "Completa el ID del Préstamo y el ID del Libro para devolver.");
-            }
-        });
-
-        return panel;
-    }   
-
-    private void actualizarTabla() {
-        modeloTabla.setRowCount(0);
-        List<Libro> libros = libroDAO.listarLibros();
-        for (Libro l : libros) {
-            modeloTabla.addRow(new Object[]{l.getIdLibro(), l.getTitulo(), l.getAutor(), l.getIsbn(), l.getDisponible()});
-        }
-    }
-
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new VentanaPrincipal().setVisible(true));
-    }
-
+    /**
+     * PESTAÑA 2: GESTIÓN DE SOCIOS
+     */
     private JPanel crearPanelSocios() {
         JPanel panel = new JPanel(new BorderLayout());
 
@@ -196,7 +127,7 @@ public class VentanaPrincipal extends JFrame {
         panel.add(panelFormulario, BorderLayout.NORTH);
         panel.add(scrollTabla, BorderLayout.CENTER);
 
-        // Evento del botón registrar socio
+        // Evento para añadir socios con validaciones de seguridad
         btnAgregarSocio.addActionListener(e -> {
             String nombre = txtNombre.getText().trim();
             String email = txtEmail.getText().trim();
@@ -209,14 +140,100 @@ public class VentanaPrincipal extends JFrame {
                     actualizarTablaSocios();
                     txtNombre.setText(""); txtEmail.setText(""); txtTelefono.setText("");
                 } else {
-                    JOptionPane.showMessageDialog(this, "Error al registrar el socio. Quizás el email ya existe.");
+                    JOptionPane.showMessageDialog(this, "Error al registrar el socio. Quizás el email ya esté duplicado.");
                 }
             } else {
-                JOptionPane.showMessageDialog(this, "Por favor, complete al menos Nombre y Email.");
+                JOptionPane.showMessageDialog(this, "Por favor, complete obligatoriamente Nombre y Email.");
             }
         });
 
         return panel;
+    }
+
+    /**
+     * PESTAÑA 3: PRÉSTAMOS Y DEVOLUCIONES
+     */
+    private JPanel crearPanelPrestamos() {
+        JPanel panel = new JPanel(new BorderLayout());
+
+        // Formulario de operaciones de Préstamos (Superior)
+        JPanel panelFormulario = new JPanel(new GridLayout(4, 2, 5, 5));
+        panelFormulario.setBorder(BorderFactory.createTitledBorder("Registrar Préstamo / Devolución"));
+        
+        JTextField txtIdLibro = new JTextField();
+        JTextField txtIdSocio = new JTextField();
+        JTextField txtIdPrestamoDevolucion = new JTextField();
+        
+        JButton btnPrestar = new JButton("Registrar Préstamo");
+        JButton btnDevolver = new JButton("Registrar Devolución");
+
+        panelFormulario.add(new JLabel(" ID Libro (para prestar):")); panelFormulario.add(txtIdLibro);
+        panelFormulario.add(new JLabel(" ID Socio (para prestar):")); panelFormulario.add(txtIdSocio);
+        panelFormulario.add(new JLabel(" ID Préstamo (solo para devolución):")); panelFormulario.add(txtIdPrestamoDevolucion);
+        panelFormulario.add(btnPrestar); panelFormulario.add(btnDevolver);
+
+        // Tabla de Historial Inferior (Préstamos Activos con JOIN de nombres)
+        JPanel panelTabla = new JPanel(new BorderLayout());
+        panelTabla.setBorder(BorderFactory.createTitledBorder("Libros actualmente prestados"));
+        
+        modeloTablaPrestamos = new DefaultTableModel(new String[]{"ID Préstamo", "Libro", "Socio", "Fecha Préstamo"}, 0);
+        tablaPrestamos = new JTable(modeloTablaPrestamos);
+        JScrollPane scrollTabla = new JScrollPane(tablaPrestamos);
+        panelTabla.add(scrollTabla, BorderLayout.CENTER);
+
+        panel.add(panelFormulario, BorderLayout.NORTH);
+        panel.add(panelTabla, BorderLayout.CENTER);
+
+        // Evento para procesar un nuevo préstamo
+        btnPrestar.addActionListener(e -> {
+            try {
+                int idLibro = Integer.parseInt(txtIdLibro.getText().trim());
+                int idSocio = Integer.parseInt(txtIdSocio.getText().trim());
+                
+                if (prestamoDAO.registrarPrestamo(idLibro, idSocio)) {
+                    JOptionPane.showMessageDialog(this, "¡Préstamo registrado con éxito! El stock ha disminuido.");
+                    actualizarTabla(); 
+                    actualizarTablaPrestamos(); 
+                    txtIdLibro.setText(""); txtIdSocio.setText("");
+                } else {
+                    JOptionPane.showMessageDialog(this, "No se pudo realizar el préstamo. Verifica si hay stock disponible o si los IDs existen.");
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Por favor, ingresa IDs numéricos válidos en los campos de préstamo.");
+            }
+        });
+
+        // Evento para procesar una devolución
+        btnDevolver.addActionListener(e -> {
+            try {
+                int idPrestamo = Integer.parseInt(txtIdPrestamoDevolucion.getText().trim());
+                int idLibro = Integer.parseInt(txtIdLibro.getText().trim()); 
+                
+                if (prestamoDAO.registrarDevolucion(idPrestamo, idLibro)) {
+                    JOptionPane.showMessageDialog(this, "¡Devolución registrada con éxito! El libro vuelve a estar disponible.");
+                    actualizarTabla(); 
+                    actualizarTablaPrestamos(); 
+                    txtIdPrestamoDevolucion.setText(""); txtIdLibro.setText("");
+                } else {
+                    JOptionPane.showMessageDialog(this, "Error al registrar la devolución. Verifica el ID del préstamo.");
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Completa el ID del Préstamo y el ID del Libro para efectuar la devolución.");
+            }
+        });
+
+        return panel;
+    }   
+
+    /**
+     * MÉTODOS DE ACTUALIZACIÓN DE DATOS (Sincronizan base de datos -> JTables)
+     */
+    private void actualizarTabla() {
+        modeloTabla.setRowCount(0);
+        List<Libro> libros = libroDAO.listarLibros();
+        for (Libro l : libros) {
+            modeloTabla.addRow(new Object[]{l.getIdLibro(), l.getTitulo(), l.getAutor(), l.getIsbn(), l.getDisponible()});
+        }
     }
 
     private void actualizarTablaSocios() {
@@ -229,9 +246,16 @@ public class VentanaPrincipal extends JFrame {
 
     private void actualizarTablaPrestamos() {
         modeloTablaPrestamos.setRowCount(0);
-        java.util.List<Object[]> prestamos = prestamoDAO.listarPrestamosActivos();
+        List<Object[]> prestamos = prestamoDAO.listarPrestamosActivos();
         for (Object[] row : prestamos) {
             modeloTablaPrestamos.addRow(row);
         }
+    }
+
+    /**
+     * MÉTODO DE ENTRADA PRINCIPAL
+     */
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new VentanaPrincipal().setVisible(true));
     }
 }

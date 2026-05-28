@@ -47,4 +47,20 @@ public class LibroDAO {
         }
         return lista;
     }
+
+    public int obtenerStockDisponible(int idLibro) {
+        String sql = "SELECT disponible FROM libros WHERE id_libro = ?";
+        try (Connection conn = config.DatabaseConfig.getConnection();
+            PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, idLibro);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("disponible");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1; // Retorna -1 si el libro directamente no existe
+    }
 }
