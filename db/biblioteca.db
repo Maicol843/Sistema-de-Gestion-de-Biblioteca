@@ -1,0 +1,30 @@
+CREATE DATABASE biblioteca;
+USE biblioteca;
+
+-- Tabla de Libros
+CREATE TABLE libros (
+    id_libro INT AUTO_INCREMENT PRIMARY KEY,
+    titulo VARCHAR(150) NOT NULL,
+    autor VARCHAR(100) NOT NULL,
+    isbn VARCHAR(20) UNIQUE NOT NULL,
+    disponible INT DEFAULT 1 -- Cantidad de ejemplares disponibles
+);
+
+-- Tabla de Socios
+CREATE TABLE socios (
+    id_socio INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE,
+    telefono VARCHAR(20)
+);
+
+-- Tabla de Préstamos
+CREATE TABLE prestamos (
+    id_prestamo INT AUTO_INCREMENT PRIMARY KEY,
+    id_libro INT,
+    id_socio INT,
+    fecha_prestamo DATE NOT NULL,
+    fecha_devolucion DATE DEFAULT NULL, -- NULL significa que aún no se ha devuelto
+    FOREIGN KEY (id_libro) REFERENCES libros(id_libro),
+    FOREIGN KEY (id_socio) REFERENCES socios(id_socio)
+);
