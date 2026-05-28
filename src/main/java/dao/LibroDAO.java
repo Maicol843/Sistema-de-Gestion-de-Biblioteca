@@ -63,4 +63,25 @@ public class LibroDAO {
         }
         return -1; // Retorna -1 si el libro directamente no existe
     }
+
+    public boolean modificarLibro(Libro libro) {
+        String sql = "UPDATE libros SET titulo = ?, autor = ?, isbn = ? WHERE id_libro = ?";
+        try (java.sql.Connection con = config.DatabaseConfig.getConnection();
+            java.sql.PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, libro.getTitulo());
+            ps.setString(2, libro.getAutor());
+            ps.setString(3, libro.getIsbn());
+            ps.setInt(4, libro.getIdLibro());
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) { e.printStackTrace(); return false; }
+    }
+
+    public boolean eliminarLibro(int id) {
+        String sql = "DELETE FROM libros WHERE id_libro = ?";
+        try (java.sql.Connection con = config.DatabaseConfig.getConnection();
+            java.sql.PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) { e.printStackTrace(); return false; }
+    }
 }

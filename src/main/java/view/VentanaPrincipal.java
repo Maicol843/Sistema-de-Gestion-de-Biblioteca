@@ -43,108 +43,159 @@ public class VentanaPrincipal extends JFrame {
     private JTable tablaPrestamos;
     private DefaultTableModel modeloTablaPrestamos;
 
+    // Variables de control para saber qué ID se está editando
+    private int idLibroSeleccionado = -1;
+    private int idSocioSeleccionado = -1;
+
     public VentanaPrincipal() {
         setTitle("Sistema de Gestión de Biblioteca");
-        setSize(850, 650);
+        setSize(900, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
         JTabbedPane pestañas = new JTabbedPane();
 
-        // Agregar las tres pestañas principales de la aplicación
         pestañas.addTab("Inventario de Libros", crearPanelLibros());
         pestañas.addTab("Gestión de Socios", crearPanelSocios());
         pestañas.addTab("Préstamos y Devoluciones", crearPanelPrestamos());
 
         add(pestañas);
 
-        // Forzar la carga inicial de datos desde MySQL a las tablas de la interfaz
         actualizarTabla();
         actualizarTablaSocios();
         actualizarTablaPrestamos();
     }
 
     /**
-     * PESTAÑA 1: INVENTARIO DE LIBROS
+     * PESTAÑA 1: INVENTARIO DE LIBROS (ALTAS, BAJAS, MODIFICACIONES)
      */
     private JPanel crearPanelLibros() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // Formulario superior para añadir libros
-        JPanel panelFormulario = new JPanel(new GridLayout(4, 2, 8, 8));
-        panelFormulario.setBorder(BorderFactory.createTitledBorder("Registrar Nuevo Libro"));
+        JPanel panelFormulario = new JPanel(new GridLayout(5, 2, 8, 8));
+        panelFormulario.setBorder(BorderFactory.createTitledBorder("Formulario de Libros (Registrar / Editar)"));
         
         JTextField txtTitulo = new JTextField();
         JTextField txtAutor = new JTextField();
         JTextField txtIsbn = new JTextField();
-        JButton btnAgregar = new JButton("Agregar Libro");
+        
+        JButton btnAgregar = new JButton("Agregar Nuevo");
+        JButton btnModificar = new JButton("Guardar Cambios");
+        JButton btnEliminar = new JButton("Eliminar Seleccionado");
+        btnModificar.setEnabled(false);
+        btnEliminar.setEnabled(false);
 
         panelFormulario.add(new JLabel(" Título:")); panelFormulario.add(txtTitulo);
         panelFormulario.add(new JLabel(" Autor:")); panelFormulario.add(txtAutor);
         panelFormulario.add(new JLabel(" ISBN:")); panelFormulario.add(txtIsbn);
-        panelFormulario.add(new JLabel("")); panelFormulario.add(btnAgregar);
+        
+        JPanel panelBotonesAccion = new JPanel(new GridLayout(1, 3, 5, 5));
+        panelBotonesAccion.add(btnAgregar);
+        panelBotonesAccion.add(btnModificar);
+        panelBotonesAccion.add(btnEliminar);
+        
+        panelFormulario.add(new JLabel(" Acciones:")); panelFormulario.add(panelBotonesAccion);
 
-        // Panel para el buscador dinámico de Libros
         JPanel panelBuscar = new JPanel(new BorderLayout(5, 5));
         panelBuscar.setBorder(BorderFactory.createTitledBorder("Buscar Libro (Filtro en tiempo real)"));
         JTextField txtBuscarLibro = new JTextField();
         panelBuscar.add(new JLabel(" Escribe el Título o Autor a buscar: "), BorderLayout.WEST);
         panelBuscar.add(txtBuscarLibro, BorderLayout.CENTER);
 
-        // Contenedor para juntar el formulario y el buscador en la zona norte
         JPanel panelNorte = new JPanel(new BorderLayout(5, 5));
         panelNorte.add(panelFormulario, BorderLayout.NORTH);
         panelNorte.add(panelBuscar, BorderLayout.SOUTH);
 
-        // Tabla de libros
         modeloTabla = new DefaultTableModel(new String[]{"ID", "Título", "Autor", "ISBN", "Disponible"}, 0);
         tablaLibros = new JTable(modeloTabla);
         JScrollPane scrollTabla = new JScrollPane(tablaLibros);
 
-        // Configurar el enrutador de filtrado (Sorter) para los Libros
         sorterLibros = new TableRowSorter<>(modeloTabla);
         tablaLibros.setRowSorter(sorterLibros);
 
         panel.add(panelNorte, BorderLayout.NORTH);
         panel.add(scrollTabla, BorderLayout.CENTER);
 
-        // Escuchador dinámico (DocumentListener) para filtrar mientras se escribe
-        txtBuscarLibro.getDocument().addDocumentListener(new DocumentListener() {
-            @Override
-            public void insertUpdate(DocumentEvent e) { filtrar(); }
-            @Override
-            public void removeUpdate(DocumentEvent e) { filtrar(); }
-            @Override
-            public void changedUpdate(DocumentEvent e) { filtrar(); }
-
-            private void filtrar() {
-                String texto = txtBuscarLibro.getText().trim();
-                if (texto.isEmpty()) {
-                    sorterLibros.setRowFilter(null);
-                } else {
-                    sorterLibros.setRowFilter(RowFilter.regexFilter("(?i)" + texto, 1, 2));
-                }
+        tablaLibros.getSelectionModel().addListSelectionListener(e -> {
+            int filaSeleccionada = tablaLibros.getSelectedRow();
+            if (filaSeleccionada != -1) {
+                int filaModelo = tablaLibros.convertRowIndexToModel(filaSeleccionada);
+                
+                idLibroSeleccionado = Integer.parseInt(modeloTabla.getValueAt(filaModelo, 0).toString());
+                txtTitulo.setText(modeloTabla.getValueAt(filaModelo, 1).toString());
+                txtAutor.setText(modeloTabla.getValueAt(filaModelo, 2).toString());
+                txtIsbn.setText(modeloTabla.getValueAt(filaModelo, 3).toString());
+                
+                btnAgregar.setEnabled(false);
+                btnModificar.setEnabled(true);
+                btnEliminar.setEnabled(true);
             }
         });
 
-        // Evento para añadir libros
+        txtBuscarLibro.getDocument().addDocumentListener(new DocumentListener() {
+            @Override public void insertUpdate(DocumentEvent e) { filtrar(); }
+            @Override public void removeUpdate(DocumentEvent e) { filtrar(); }
+            @Override public void changedUpdate(DocumentEvent e) { filtrar(); }
+            private void filtrar() {
+                String texto = txtBuscarLibro.getText().trim();
+                if (texto.isEmpty()) { sorterLibros.setRowFilter(null); } 
+                else { sorterLibros.setRowFilter(RowFilter.regexFilter("(?i)" + texto, 1, 2)); }
+            }
+        });
+
         btnAgregar.addActionListener(e -> {
             String titulo = txtTitulo.getText().trim();
             String autor = txtAutor.getText().trim();
             String isbn = txtIsbn.getText().trim();
-            
             if(!titulo.isEmpty() && !autor.isEmpty() && !isbn.isEmpty()) {
                 Libro nuevoLibro = new Libro(0, titulo, autor, isbn, 1);
                 if(libroDAO.agregarLibro(nuevoLibro)) {
                     JOptionPane.showMessageDialog(this, "Libro agregado con éxito.");
                     actualizarTabla();
                     txtTitulo.setText(""); txtAutor.setText(""); txtIsbn.setText("");
-                } else {
-                    JOptionPane.showMessageDialog(this, "Error al agregar el libro en la base de datos.");
                 }
-            } else {
-                JOptionPane.showMessageDialog(this, "Por favor, llene todos los campos del formulario.");
+            } else { JOptionPane.showMessageDialog(this, "Complete todos los campos."); }
+        });
+
+        btnModificar.addActionListener(e -> {
+            String titulo = txtTitulo.getText().trim();
+            String autor = txtAutor.getText().trim();
+            String isbn = txtIsbn.getText().trim();
+            if(idLibroSeleccionado != -1 && !titulo.isEmpty() && !autor.isEmpty() && !isbn.isEmpty()) {
+                int disponible = Integer.parseInt(modeloTabla.getValueAt(tablaLibros.convertRowIndexToModel(tablaLibros.getSelectedRow()), 4).toString());
+                Libro libroEditado = new Libro(idLibroSeleccionado, titulo, autor, isbn, disponible);
+                
+                if(libroDAO.modificarLibro(libroEditado)) {
+                    JOptionPane.showMessageDialog(this, "Libro actualizado con éxito.");
+                    actualizarTabla();
+                    idLibroSeleccionado = -1;
+                    txtTitulo.setText(""); txtAutor.setText(""); txtIsbn.setText("");
+                    btnAgregar.setEnabled(true); btnModificar.setEnabled(false); btnEliminar.setEnabled(false);
+                    tablaLibros.clearSelection();
+                }
+            }
+        });
+
+        btnEliminar.addActionListener(e -> {
+            if (idLibroSeleccionado != -1) {
+                int disponible = Integer.parseInt(modeloTabla.getValueAt(tablaLibros.convertRowIndexToModel(tablaLibros.getSelectedRow()), 4).toString());
+                if (disponible == 0) {
+                    JOptionPane.showMessageDialog(this, "No se puede eliminar el libro porque se encuentra prestado actualmente.", "Baja Denegada", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+                
+                int respuesta = JOptionPane.showConfirmDialog(this, "¿Está seguro de eliminar este libro de forma permanente?", "Confirmar Baja", JOptionPane.YES_NO_OPTION);
+                if (respuesta == JOptionPane.YES_OPTION) {
+                    if (libroDAO.eliminarLibro(idLibroSeleccionado)) {
+                        JOptionPane.showMessageDialog(this, "Libro eliminado correctamente.");
+                        actualizarTabla();
+                        idLibroSeleccionado = -1;
+                        txtTitulo.setText(""); txtAutor.setText(""); txtIsbn.setText("");
+                        btnAgregar.setEnabled(true); btnModificar.setEnabled(false); btnEliminar.setEnabled(false);
+                        tablaLibros.clearSelection();
+                    }
+                }
             }
         });
 
@@ -152,86 +203,136 @@ public class VentanaPrincipal extends JFrame {
     }
 
     /**
-     * PESTAÑA 2: GESTIÓN DE SOCIOS
+     * PESTAÑA 2: GESTIÓN DE SOCIOS (ALTAS, BAJAS, MODIFICACIONES)
      */
     private JPanel crearPanelSocios() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // Formulario superior para añadir socios
-        JPanel panelFormulario = new JPanel(new GridLayout(4, 2, 8, 8));
-        panelFormulario.setBorder(BorderFactory.createTitledBorder("Registrar Nuevo Socio"));
+        JPanel panelFormulario = new JPanel(new GridLayout(5, 2, 8, 8));
+        panelFormulario.setBorder(BorderFactory.createTitledBorder("Formulario de Socios (Registrar / Editar)"));
         
         JTextField txtNombre = new JTextField();
         JTextField txtEmail = new JTextField();
         JTextField txtTelefono = new JTextField();
+        
         JButton btnAgregarSocio = new JButton("Registrar Socio");
+        JButton btnModificarSocio = new JButton("Guardar Cambios");
+        JButton btnEliminarSocio = new JButton("Dar de Baja");
+        btnModificarSocio.setEnabled(false);
+        btnEliminarSocio.setEnabled(false);
 
         panelFormulario.add(new JLabel(" Nombre Completo:")); panelFormulario.add(txtNombre);
         panelFormulario.add(new JLabel(" Email:")); panelFormulario.add(txtEmail);
         panelFormulario.add(new JLabel(" Teléfono:")); panelFormulario.add(txtTelefono);
-        panelFormulario.add(new JLabel("")); panelFormulario.add(btnAgregarSocio);
+        
+        JPanel panelBotonesAccion = new JPanel(new GridLayout(1, 3, 5, 5));
+        panelBotonesAccion.add(btnAgregarSocio);
+        panelBotonesAccion.add(btnModificarSocio);
+        panelBotonesAccion.add(btnEliminarSocio);
+        panelFormulario.add(new JLabel(" Acciones:")); panelFormulario.add(panelBotonesAccion);
 
-        // Panel para el buscador dinámico de Socios
         JPanel panelBuscar = new JPanel(new BorderLayout(5, 5));
         panelBuscar.setBorder(BorderFactory.createTitledBorder("Buscar Socio (Filtro en tiempo real)"));
         JTextField txtBuscarSocio = new JTextField();
         panelBuscar.add(new JLabel(" Escribe el Nombre del socio: "), BorderLayout.WEST);
         panelBuscar.add(txtBuscarSocio, BorderLayout.CENTER);
 
-        // Contenedor para juntar el formulario y el buscador
         JPanel panelNorte = new JPanel(new BorderLayout(5, 5));
         panelNorte.add(panelFormulario, BorderLayout.NORTH);
         panelNorte.add(panelBuscar, BorderLayout.SOUTH);
 
-        // Tabla de socios
         modeloTablaSocios = new DefaultTableModel(new String[]{"ID Socio", "Nombre", "Email", "Teléfono"}, 0);
         tablaSocios = new JTable(modeloTablaSocios);
         JScrollPane scrollTabla = new JScrollPane(tablaSocios);
 
-        // Configurar el enrutador de filtrado (Sorter) para los Socios
         sorterSocios = new TableRowSorter<>(modeloTablaSocios);
         tablaSocios.setRowSorter(sorterSocios);
 
         panel.add(panelNorte, BorderLayout.NORTH);
         panel.add(scrollTabla, BorderLayout.CENTER);
 
-        // Escuchador dinámico para el campo de búsqueda de socios
-        txtBuscarSocio.getDocument().addDocumentListener(new DocumentListener() {
-            @Override
-            public void insertUpdate(DocumentEvent e) { filtrar(); }
-            @Override
-            public void removeUpdate(DocumentEvent e) { filtrar(); }
-            @Override
-            public void changedUpdate(DocumentEvent e) { filtrar(); }
-
-            private void filtrar() {
-                String texto = txtBuscarSocio.getText().trim();
-                if (texto.isEmpty()) {
-                    sorterSocios.setRowFilter(null);
-                } else {
-                    sorterSocios.setRowFilter(RowFilter.regexFilter("(?i)" + texto, 1));
-                }
+        tablaSocios.getSelectionModel().addListSelectionListener(e -> {
+            int filaSeleccionada = tablaSocios.getSelectedRow();
+            if (filaSeleccionada != -1) {
+                int filaModelo = tablaSocios.convertRowIndexToModel(filaSeleccionada);
+                
+                idSocioSeleccionado = Integer.parseInt(modeloTablaSocios.getValueAt(filaModelo, 0).toString());
+                txtNombre.setText(modeloTablaSocios.getValueAt(filaModelo, 1).toString());
+                txtEmail.setText(modeloTablaSocios.getValueAt(filaModelo, 2).toString());
+                txtTelefono.setText(modeloTablaSocios.getValueAt(filaModelo, 3) != null ? modeloTablaSocios.getValueAt(filaModelo, 3).toString() : "");
+                
+                btnAgregarSocio.setEnabled(false);
+                btnModificarSocio.setEnabled(true);
+                btnEliminarSocio.setEnabled(true);
             }
         });
 
-        // Evento para añadir socios
+        txtBuscarSocio.getDocument().addDocumentListener(new DocumentListener() {
+            @Override public void insertUpdate(DocumentEvent e) { filtrar(); }
+            @Override public void removeUpdate(DocumentEvent e) { filtrar(); }
+            @Override public void changedUpdate(DocumentEvent e) { filtrar(); }
+            private void filtrar() {
+                String texto = txtBuscarSocio.getText().trim();
+                if (texto.isEmpty()) { sorterSocios.setRowFilter(null); } 
+                else { sorterSocios.setRowFilter(RowFilter.regexFilter("(?i)" + texto, 1)); }
+            }
+        });
+
         btnAgregarSocio.addActionListener(e -> {
             String nombre = txtNombre.getText().trim();
             String email = txtEmail.getText().trim();
             String telefono = txtTelefono.getText().trim();
-            
             if (!nombre.isEmpty() && !email.isEmpty()) {
                 Socio nuevoSocio = new Socio(0, nombre, email, telefono);
                 if (socioDAO.agregarSocio(nuevoSocio)) {
                     JOptionPane.showMessageDialog(this, "Socio registrado con éxito.");
                     actualizarTablaSocios();
                     txtNombre.setText(""); txtEmail.setText(""); txtTelefono.setText("");
-                } else {
-                    JOptionPane.showMessageDialog(this, "Error al registrar el socio. Quizás el email ya esté duplicado.");
                 }
-            } else {
-                JOptionPane.showMessageDialog(this, "Por favor, complete obligatoriamente Nombre y Email.");
+            } else { JOptionPane.showMessageDialog(this, "Nombre y Email obligatorios."); }
+        });
+
+        btnModificarSocio.addActionListener(e -> {
+            String nombre = txtNombre.getText().trim();
+            String email = txtEmail.getText().trim();
+            String telefono = txtTelefono.getText().trim();
+            if (idSocioSeleccionado != -1 && !nombre.isEmpty() && !email.isEmpty()) {
+                Socio socioEditado = new Socio(idSocioSeleccionado, nombre, email, telefono);
+                if (socioDAO.modificarSocio(socioEditado)) {
+                    JOptionPane.showMessageDialog(this, "Datos del socio actualizados.");
+                    actualizarTablaSocios();
+                    idSocioSeleccionado = -1;
+                    txtNombre.setText(""); txtEmail.setText(""); txtTelefono.setText("");
+                    btnAgregarSocio.setEnabled(true); btnModificarSocio.setEnabled(false); btnEliminarSocio.setEnabled(false);
+                    tablaSocios.clearSelection();
+                }
+            }
+        });
+
+        btnEliminarSocio.addActionListener(e -> {
+            if (idSocioSeleccionado != -1) {
+                String nombreSocio = modeloTablaSocios.getValueAt(tablaSocios.convertRowIndexToModel(tablaSocios.getSelectedRow()), 1).toString();
+                
+                boolean tieneDeudas = prestamoDAO.listarPrestamosActivos().stream()
+                        .anyMatch(fila -> fila[2] != null && fila[2].toString().equalsIgnoreCase(nombreSocio));
+                
+                if (tieneDeudas) {
+                    JOptionPane.showMessageDialog(this, "No se puede dar de baja al socio porque tiene libros bajo préstamo activo.", "Baja Denegada", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+
+                int respuesta = JOptionPane.showConfirmDialog(this, "¿Desea eliminar permanentemente a este socio?", "Confirmar Baja", JOptionPane.YES_NO_OPTION);
+                if (respuesta == JOptionPane.YES_OPTION) {
+                    if (socioDAO.eliminarSocio(idSocioSeleccionado)) {
+                        JOptionPane.showMessageDialog(this, "Socio eliminado correctamente.");
+                        actualizarTablaSocios();
+                        idSocioSeleccionado = -1;
+                        txtNombre.setText(""); txtEmail.setText(""); txtTelefono.setText("");
+                        btnAgregarSocio.setEnabled(true); btnModificarSocio.setEnabled(false); btnEliminarSocio.setEnabled(false);
+                        tablaSocios.clearSelection();
+                    }
+                }
             }
         });
 
@@ -245,7 +346,6 @@ public class VentanaPrincipal extends JFrame {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // Formulario de operaciones de Préstamos (Superior)
         JPanel panelFormulario = new JPanel(new GridLayout(4, 2, 8, 8));
         panelFormulario.setBorder(BorderFactory.createTitledBorder("Registrar Préstamo / Devolución"));
         
@@ -261,7 +361,6 @@ public class VentanaPrincipal extends JFrame {
         panelFormulario.add(new JLabel(" ID Préstamo (solo para devolución):")); panelFormulario.add(txtIdPrestamoDevolucion);
         panelFormulario.add(btnPrestar); panelFormulario.add(btnDevolver);
 
-        // Tabla de Historial Inferior
         JPanel panelTabla = new JPanel(new BorderLayout());
         panelTabla.setBorder(BorderFactory.createTitledBorder("Libros actualmente prestados"));
         
@@ -270,123 +369,115 @@ public class VentanaPrincipal extends JFrame {
         JScrollPane scrollTabla = new JScrollPane(tablaPrestamos);
         panelTabla.add(scrollTabla, BorderLayout.CENTER);
 
-        // Botón de exportación a PDF (Especificamos java.awt.Font para evitar el choque)
+        tablaPrestamos.getSelectionModel().addListSelectionListener(e -> {
+            int fila = tablaPrestamos.getSelectedRow();
+            if (fila != -1) {
+                txtIdPrestamoDevolucion.setText(modeloTablaPrestamos.getValueAt(fila, 0).toString());
+            }
+        });
+
         JButton btnExportarPDF = new JButton("Exportar Reporte en PDF");
+        // Se usa java.awt.Font de forma explícita para evitar conflicto con iText
         btnExportarPDF.setFont(new java.awt.Font("Helvetica", java.awt.Font.BOLD, 12));
         
         JPanel panelBotonPDF = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         panelBotonPDF.add(btnExportarPDF);
         panelTabla.add(panelBotonPDF, BorderLayout.SOUTH); 
 
-        // Evento para gatillar la creación del PDF al hacer clic
         btnExportarPDF.addActionListener(e -> exportarReportePDF());
 
         panel.add(panelFormulario, BorderLayout.NORTH);
         panel.add(panelTabla, BorderLayout.CENTER);
 
-        // Evento del botón Prestar (Con reglas de negocio incorporadas)
         btnPrestar.addActionListener(e -> {
             try {
-                // 1. Validar que los campos no estén vacíos
                 String txtLibro = txtIdLibro.getText().trim();
                 String txtSocio = txtIdSocio.getText().trim();
                 
                 if (txtLibro.isEmpty() || txtSocio.isEmpty()) {
-                    JOptionPane.showMessageDialog(this, "Por favor, complete los campos 'ID Libro' e 'ID Socio'.", "Campos Incompletos", JOptionPane.WARNING_MESSAGE);
+                    JOptionPane.showMessageDialog(this, "Complete ID Libro e ID Socio.", "Campos Incompletos", JOptionPane.WARNING_MESSAGE);
                     return;
                 }
 
                 int idLibro = Integer.parseInt(txtLibro);
                 int idSocio = Integer.parseInt(txtSocio);
                 
-                // 2. CAPA DE VALIDACIÓN 1: ¿Existe el Socio en la base de datos?
-                // Reutilizamos el buscarSocio o listar para verificar existencia
                 model.Socio socioExistente = socioDAO.listarSocios().stream()
-                        .filter(s -> s.getIdSocio() == idSocio)
-                        .findFirst()
-                        .orElse(null);
+                        .filter(s -> s.getIdSocio() == idSocio).findFirst().orElse(null);
 
                 if (socioExistente == null) {
-                    JOptionPane.showMessageDialog(this, "El ID de Socio ingresado (" + idSocio + ") NO existe en el sistema.", "Socio No Encontrado", JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(this, "El ID de Socio no existe.", "Socio No Encontrado", JOptionPane.ERROR_MESSAGE);
                     return;
                 }
 
-                // 3. CAPA DE VALIDACIÓN 2: ¿Existe el Libro y tiene Stock Disponible?
                 model.Libro libroExistente = libroDAO.listarLibros().stream()
-                        .filter(l -> l.getIdLibro() == idLibro)
-                        .findFirst()
-                        .orElse(null);
+                        .filter(l -> l.getIdLibro() == idLibro).findFirst().orElse(null);
 
                 if (libroExistente == null) {
-                    JOptionPane.showMessageDialog(this, "El ID de Libro ingresado (" + idLibro + ") NO existe en el inventario.", "Libro No Encontrado", JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(this, "El ID de Libro no existe.", "Libro No Encontrado", JOptionPane.ERROR_MESSAGE);
                     return;
                 }
 
                 if (libroExistente.getDisponible() == 0) {
-                    JOptionPane.showMessageDialog(this, "El libro '" + libroExistente.getTitulo() + "' ya se encuentra prestado y NO tiene stock disponible.", "Sin Stock", JOptionPane.WARNING_MESSAGE);
+                    JOptionPane.showMessageDialog(this, "El libro ya está prestado.", "Sin Stock", JOptionPane.WARNING_MESSAGE);
                     return;
                 }
 
-                // 4. CAPA DE VALIDACIÓN 3: ¿El socio superó el límite máximo de préstamos activos?
-                // Contamos cuántos préstamos activos tiene el socio actual en la lista
                 long prestamosActivosDelSocio = prestamoDAO.listarPrestamosActivos().stream()
                         .filter(fila -> fila[2] != null && fila[2].toString().equalsIgnoreCase(socioExistente.getNombre()))
                         .count();
 
-                int limiteMaximo = 3; // Puedes cambiar este número según las reglas de tu biblioteca
-                if (prestamosActivosDelSocio >= limiteMaximo) {
-                    JOptionPane.showMessageDialog(this, 
-                        "Préstamo Denegado:\nEl socio " + socioExistente.getNombre() + " ya posee " + prestamosActivosDelSocio + " libros sin devolver.\nSaldar deudas antes de retirar otro.", 
-                        "Límite de Préstamos Superado", 
-                        JOptionPane.WARNING_MESSAGE);
+                if (prestamosActivosDelSocio >= 3) {
+                    JOptionPane.showMessageDialog(this, "El socio ya tiene 3 libros sin devolver.", "Límite Superado", JOptionPane.WARNING_MESSAGE);
                     return;
                 }
 
-                // 5. Si superó todas las validaciones, procedemos a realizar la transacción en MySQL
                 if (prestamoDAO.registrarPrestamo(idLibro, idSocio)) {
-                    JOptionPane.showMessageDialog(this, "¡Préstamo registrado con éxito!\nLibro entregado a: " + socioExistente.getNombre(), "Transacción Exitosa", JOptionPane.INFORMATION_MESSAGE);
-                    
-                    // Actualizar las tablas visuales de inmediato
+                    JOptionPane.showMessageDialog(this, "¡Préstamo registrado con éxito!");
                     actualizarTabla();
                     actualizarTablaPrestamos();
-                    
-                    // Limpiar las cajas de texto
-                    txtIdLibro.setText(""); 
-                    txtIdSocio.setText("");
-                } else {
-                    JOptionPane.showMessageDialog(this, "Hubo un error inesperado en la base de datos al registrar el préstamo.", "Error Interno", JOptionPane.ERROR_MESSAGE);
+                    txtIdLibro.setText(""); txtIdSocio.setText("");
                 }
-
             } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(this, "Los campos de ID deben contener únicamente valores numéricos enteros.", "Error de Formato", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Ingrese números válidos.", "Error de Formato", JOptionPane.ERROR_MESSAGE);
             }
         });
 
-        // Evento del botón Devolver
         btnDevolver.addActionListener(e -> {
             try {
                 int idPrestamo = Integer.parseInt(txtIdPrestamoDevolucion.getText().trim());
-                int idLibro = Integer.parseInt(txtIdLibro.getText().trim());
+                
+                int idLibro = -1;
+                List<Object[]> activos = prestamoDAO.listarPrestamosActivos();
+                for (Object[] row : activos) {
+                    if (Integer.parseInt(row[0].toString()) == idPrestamo) {
+                        String tituloLibro = row[1].toString();
+                        Libro lab = libroDAO.listarLibros().stream()
+                                .filter(l -> l.getTitulo().equalsIgnoreCase(tituloLibro)).findFirst().orElse(null);
+                        if (lab != null) idLibro = lab.getIdLibro();
+                        break;
+                    }
+                }
+
+                if (idLibro == -1) {
+                    JOptionPane.showMessageDialog(this, "ID de préstamo inválido o ya devuelto.", "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
                 
                 if (prestamoDAO.registrarDevolucion(idPrestamo, idLibro)) {
-                    JOptionPane.showMessageDialog(this, "¡Devolución registrada con éxito! El libro vuelve a estar disponible.");
+                    JOptionPane.showMessageDialog(this, "¡Devolución registrada con éxito!");
                     actualizarTabla();
                     actualizarTablaPrestamos();
-                    txtIdPrestamoDevolucion.setText(""); txtIdLibro.setText("");
-                } else {
-                    JOptionPane.showMessageDialog(this, "Error al registrar la devolución. Verifica el ID del préstamo.");
+                    txtIdPrestamoDevolucion.setText("");
                 }
             } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(this, "Completa el ID del Préstamo y el ID del Libro para efectuar la devolución.");
+                JOptionPane.showMessageDialog(this, "Complete el ID del Préstamo.", "Error de Formato", JOptionPane.ERROR_MESSAGE);
             }
         });
 
         return panel;
     }   
 
-    /**
-     * MÉTODOS DE ACTUALIZACIÓN DE DATOS
-     */
     private void actualizarTabla() {
         modeloTabla.setRowCount(0);
         List<Libro> libros = libroDAO.listarLibros();
@@ -412,131 +503,67 @@ public class VentanaPrincipal extends JFrame {
     }
 
     private void exportarReportePDF() {
-        // 1. Obtener los préstamos activos desde el DAO
         List<Object[]> prestamosActivos = prestamoDAO.listarPrestamosActivos();
-
         if (prestamosActivos.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "No hay préstamos activos en este momento para exportar.", "Reporte Vacío", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "No hay préstamos activos.", "Reporte Vacío", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
 
-        // 2. Usar JFileChooser para que el usuario elija dónde guardar el archivo de forma segura
         JFileChooser selectorArchivos = new JFileChooser();
-        selectorArchivos.setDialogTitle("Seleccione dónde guardar el Reporte PDF");
-        // Sugerimos un nombre por defecto
         selectorArchivos.setSelectedFile(new File("Reporte_Prestamos_Activos.pdf"));
+        if (selectorArchivos.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
 
-        int seleccion = selectorArchivos.showSaveDialog(this);
+        String rutaCompleta = selectorArchivos.getSelectedFile().getAbsolutePath();
+        if (!rutaCompleta.toLowerCase().endsWith(".pdf")) rutaCompleta += ".pdf";
 
-        // Si el usuario cancela o cierra la ventana, detenemos el proceso
-        if (seleccion != JFileChooser.APPROVE_OPTION) {
-            return; 
-        }
-
-        // Obtenemos el archivo seleccionado por el usuario
-        File archivoDestino = selectorArchivos.getSelectedFile();
-        String rutaCompleta = archivoDestino.getAbsolutePath();
-
-        // Asegurar que termine en .pdf si el usuario lo borró sin querer
-        if (!rutaCompleta.toLowerCase().endsWith(".pdf")) {
-            rutaCompleta += ".pdf";
-        }
-
-        // 3. Crear el documento PDF utilizando iText
-        Document documento = new Document(PageSize.A4, 36, 36, 54, 36); 
-
+        Document documento = new Document(PageSize.A4, 36, 36, 54, 36);
         try {
             PdfWriter.getInstance(documento, new FileOutputStream(rutaCompleta));
             documento.open();
 
-            // --- DISEÑO Y ESTILOS DEL PDF ---
-            com.itextpdf.text.Font fuenteTitulo = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 22, com.itextpdf.text.Font.BOLD, new BaseColor(41, 128, 185)); 
+            // Uso explícito de com.itextpdf.text.Font para el PDF
+            com.itextpdf.text.Font fuenteTitulo = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 22, com.itextpdf.text.Font.BOLD, new BaseColor(41, 128, 185));
             com.itextpdf.text.Font fuenteSubtitulo = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 10, com.itextpdf.text.Font.ITALIC, BaseColor.GRAY);
             com.itextpdf.text.Font fuenteTexto = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 11, com.itextpdf.text.Font.NORMAL, BaseColor.BLACK);
             com.itextpdf.text.Font fuenteEncabezadoTabla = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 11, com.itextpdf.text.Font.BOLD, BaseColor.WHITE);
 
-            // Encabezado del Reporte
             Paragraph titulo = new Paragraph("SISTEMA DE GESTIÓN DE BIBLIOTECA", fuenteTitulo);
             titulo.setAlignment(Element.ALIGN_CENTER);
             documento.add(titulo);
 
             Paragraph reporteNombre = new Paragraph("Reporte de Préstamos Activos y Deudas", new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 14, com.itextpdf.text.Font.BOLD, BaseColor.DARK_GRAY));
-            reporteNombre.setAlignment(Element.ALIGN_CENTER);
-            reporteNombre.setSpacingBefore(5);
-            documento.add(reporteNombre);
+            reporteNombre.setAlignment(Element.ALIGN_CENTER); documento.add(reporteNombre);
 
-            // Fecha y hora de emisión automática
             DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
             Paragraph fecha = new Paragraph("Generado el: " + dtf.format(LocalDateTime.now()), fuenteSubtitulo);
-            fecha.setAlignment(Element.ALIGN_CENTER);
-            fecha.setSpacingAfter(20);
-            documento.add(fecha);
+            fecha.setAlignment(Element.ALIGN_CENTER); fecha.setSpacingAfter(20); documento.add(fecha);
 
-            // Línea divisoria decorativa
-            documento.add(new Paragraph(new Chunk(new com.itextpdf.text.pdf.draw.LineSeparator(1f, 100f, new BaseColor(210, 215, 223), Element.ALIGN_CENTER, -1))));
-            documento.add(new Paragraph(" ")); 
-
-            // 4. Estructura de la Tabla en el PDF
             PdfPTable tablaPDF = new PdfPTable(4);
-            tablaPDF.setWidthPercentage(100); 
-            tablaPDF.setWidths(new float[]{1.5f, 4f, 4f, 2.5f}); 
+            tablaPDF.setWidthPercentage(100); tablaPDF.setWidths(new float[]{1.5f, 4f, 4f, 2.5f});
 
             String[] encabezados = {"ID Préstamo", "Libro Prestado", "Socio / Deudor", "Fecha de Préstamo"};
-            BaseColor colorFondoEncabezado = new BaseColor(44, 62, 80); 
-
             for (String enc : encabezados) {
-                PdfPCell celdaEncabezado = new PdfPCell(new Phrase(enc, fuenteEncabezadoTabla));
-                celdaEncabezado.setBackgroundColor(colorFondoEncabezado);
-                celdaEncabezado.setHorizontalAlignment(Element.ALIGN_CENTER);
-                celdaEncabezado.setPadding(8);
-                tablaPDF.addCell(celdaEncabezado);
+                PdfPCell celda = new PdfPCell(new Phrase(enc, fuenteEncabezadoTabla));
+                celda.setBackgroundColor(new BaseColor(44, 62, 80)); celda.setHorizontalAlignment(Element.ALIGN_CENTER); celda.setPadding(8);
+                tablaPDF.addCell(celda);
             }
-
-            // 5. Inyectar las filas dinámicamente desde la consulta SQL
-            boolean filaAlterna = false;
-            BaseColor colorFilaAlterna = new BaseColor(245, 247, 250); 
 
             for (Object[] filaData : prestamosActivos) {
                 for (int i = 0; i < 4; i++) {
-                    String dato = (filaData[i] != null) ? filaData[i].toString() : "";
-                    PdfPCell celda = new PdfPCell(new Phrase(dato, fuenteTexto));
-                    
-                    if (i == 0 || i == 3) {
-                        celda.setHorizontalAlignment(Element.ALIGN_CENTER);
-                    } else {
-                        celda.setHorizontalAlignment(Element.ALIGN_LEFT);
-                    }
-                    
+                    PdfPCell celda = new PdfPCell(new Phrase(filaData[i] != null ? filaData[i].toString() : "", fuenteTexto));
+                    celda.setHorizontalAlignment(i == 0 || i == 3 ? Element.ALIGN_CENTER : Element.ALIGN_LEFT);
                     celda.setPadding(6);
-
-                    if (filaAlterna) {
-                        celda.setBackgroundColor(colorFilaAlterna);
-                    }
-                    
                     tablaPDF.addCell(celda);
                 }
-                filaAlterna = !filaAlterna;
             }
-
             documento.add(tablaPDF);
             documento.close();
-
-            // 6. Confirmación al usuario utilizando el nombre real del archivo final
-            JOptionPane.showMessageDialog(this, "¡Reporte PDF generado con éxito!\nGuardado en:\n" + rutaCompleta, "Exportación Exitosa", JOptionPane.INFORMATION_MESSAGE);
-
-        } catch (DocumentException | java.io.FileNotFoundException ex) {
-            JOptionPane.showMessageDialog(this, "Error al generar el PDF: " + ex.getMessage(), "Error de Exportación", JOptionPane.ERROR_MESSAGE);
-            ex.printStackTrace();
-        }
+            JOptionPane.showMessageDialog(this, "PDF generado con éxito.");
+        } catch (Exception ex) { ex.printStackTrace(); }
     }
 
     public static void main(String[] args) {
-        try {
-            com.formdev.flatlaf.FlatDarkLaf.setup();
-        } catch (Exception ex) {
-            System.err.println("No se pudo inicializar el estilo moderno. Usando por defecto.");
-        }
-
+        try { com.formdev.flatlaf.FlatDarkLaf.setup(); } catch (Exception ex) {}
         SwingUtilities.invokeLater(() -> new VentanaPrincipal().setVisible(true));
     }
 }

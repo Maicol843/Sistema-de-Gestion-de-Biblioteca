@@ -44,4 +44,25 @@ public class SocioDAO {
         }
         return lista;
     }
+
+    public boolean modificarSocio(Socio socio) {
+        String sql = "UPDATE socios SET nombre = ?, email = ?, telefono = ? WHERE id_socio = ?";
+        try (java.sql.Connection con = DatabaseConfig.getConnection();
+            java.sql.PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, socio.getNombre());
+            ps.setString(2, socio.getEmail());
+            ps.setString(3, socio.getTelefono());
+            ps.setInt(4, socio.getIdSocio());
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) { e.printStackTrace(); return false; }
+    }
+
+    public boolean eliminarSocio(int id) {
+        String sql = "DELETE FROM socios WHERE id_socio = ?";
+        try (java.sql.Connection con = DatabaseConfig.getConnection();
+            java.sql.PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) { e.printStackTrace(); return false; }
+    }   
 }
