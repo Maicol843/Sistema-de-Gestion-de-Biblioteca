@@ -5,7 +5,10 @@ import model.Libro;
 import model.Socio;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.util.List;
 
@@ -18,10 +21,12 @@ public class VentanaPrincipal extends JFrame {
     // Componentes de la tabla de Libros
     private JTable tablaLibros;
     private DefaultTableModel modeloTabla;
+    private TableRowSorter<DefaultTableModel> sorterLibros; // Sorter para filtrar libros
 
     // Componentes de la tabla de Socios
     private JTable tablaSocios;
     private DefaultTableModel modeloTablaSocios;
+    private TableRowSorter<DefaultTableModel> sorterSocios; // Sorter para filtrar socios
 
     // Componentes de la tabla de Préstamos
     private JTable tablaPrestamos;
@@ -53,11 +58,10 @@ public class VentanaPrincipal extends JFrame {
      */
     private JPanel crearPanelLibros() {
         JPanel panel = new JPanel(new BorderLayout());
-
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); 
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         // Formulario superior para añadir libros
-        JPanel panelFormulario = new JPanel(new GridLayout(4, 2, 8, 8)); // Aumentamos espacio entre componentes
+        JPanel panelFormulario = new JPanel(new GridLayout(4, 2, 8, 8));
         panelFormulario.setBorder(BorderFactory.createTitledBorder("Registrar Nuevo Libro"));
         
         JTextField txtTitulo = new JTextField();
@@ -70,15 +74,51 @@ public class VentanaPrincipal extends JFrame {
         panelFormulario.add(new JLabel(" ISBN:")); panelFormulario.add(txtIsbn);
         panelFormulario.add(new JLabel("")); panelFormulario.add(btnAgregar);
 
-        // Tabla central de libros
+        // Panel para el buscador dinámico de Libros
+        JPanel panelBuscar = new JPanel(new BorderLayout(5, 5));
+        panelBuscar.setBorder(BorderFactory.createTitledBorder("Buscar Libro (Filtro en tiempo real)"));
+        JTextField txtBuscarLibro = new JTextField();
+        panelBuscar.add(new JLabel(" Escribe el Título o Autor a buscar: "), BorderLayout.WEST);
+        panelBuscar.add(txtBuscarLibro, BorderLayout.CENTER);
+
+        // Contenedor para juntar el formulario y el buscador en la zona norte
+        JPanel panelNorte = new JPanel(new BorderLayout(5, 5));
+        panelNorte.add(panelFormulario, BorderLayout.NORTH);
+        panelNorte.add(panelBuscar, BorderLayout.SOUTH);
+
+        // Tabla de libros
         modeloTabla = new DefaultTableModel(new String[]{"ID", "Título", "Autor", "ISBN", "Disponible"}, 0);
         tablaLibros = new JTable(modeloTabla);
         JScrollPane scrollTabla = new JScrollPane(tablaLibros);
 
-        panel.add(panelFormulario, BorderLayout.NORTH);
+        // Configurar el enrutador de filtrado (Sorter) para los Libros
+        sorterLibros = new TableRowSorter<>(modeloTabla);
+        tablaLibros.setRowSorter(sorterLibros);
+
+        panel.add(panelNorte, BorderLayout.NORTH);
         panel.add(scrollTabla, BorderLayout.CENTER);
 
-        // Evento para añadir libros con validación básica de campos vacíos
+        // Escuchador dinámico (DocumentListener) para filtrar mientras se escribe
+        txtBuscarLibro.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) { filtrar(); }
+            @Override
+            public void removeUpdate(DocumentEvent e) { filtrar(); }
+            @Override
+            public void changedUpdate(DocumentEvent e) { filtrar(); }
+
+            private void filtrar() {
+                String texto = txtBuscarLibro.getText().trim();
+                if (texto.isEmpty()) {
+                    sorterLibros.setRowFilter(null);
+                } else {
+                    // Filtra de manera insensible a mayúsculas (?i) buscando coincidencia en Título (columna 1) o Autor (columna 2)
+                    sorterLibros.setRowFilter(RowFilter.regexFilter("(?i)" + texto, 1, 2));
+                }
+            }
+        });
+
+        // Evento para añadir libros
         btnAgregar.addActionListener(e -> {
             String titulo = txtTitulo.getText().trim();
             String autor = txtAutor.getText().trim();
@@ -122,15 +162,51 @@ public class VentanaPrincipal extends JFrame {
         panelFormulario.add(new JLabel(" Teléfono:")); panelFormulario.add(txtTelefono);
         panelFormulario.add(new JLabel("")); panelFormulario.add(btnAgregarSocio);
 
-        // Tabla central para listar socios
+        // Panel para el buscador dinámico de Socios
+        JPanel panelBuscar = new JPanel(new BorderLayout(5, 5));
+        panelBuscar.setBorder(BorderFactory.createTitledBorder("Buscar Socio (Filtro en tiempo real)"));
+        JTextField txtBuscarSocio = new JTextField();
+        panelBuscar.add(new JLabel(" Escribe el Nombre del socio: "), BorderLayout.WEST);
+        panelBuscar.add(txtBuscarSocio, BorderLayout.CENTER);
+
+        // Contenedor para juntar el formulario y el buscador
+        JPanel panelNorte = new JPanel(new BorderLayout(5, 5));
+        panelNorte.add(panelFormulario, BorderLayout.NORTH);
+        panelNorte.add(panelBuscar, BorderLayout.SOUTH);
+
+        // Tabla de socios
         modeloTablaSocios = new DefaultTableModel(new String[]{"ID Socio", "Nombre", "Email", "Teléfono"}, 0);
         tablaSocios = new JTable(modeloTablaSocios);
         JScrollPane scrollTabla = new JScrollPane(tablaSocios);
 
-        panel.add(panelFormulario, BorderLayout.NORTH);
+        // Configurar el enrutador de filtrado (Sorter) para los Socios
+        sorterSocios = new TableRowSorter<>(modeloTablaSocios);
+        tablaSocios.setRowSorter(sorterSocios);
+
+        panel.add(panelNorte, BorderLayout.NORTH);
         panel.add(scrollTabla, BorderLayout.CENTER);
 
-        // Evento para añadir socios con validaciones de seguridad
+        // Escuchador dinámico para el campo de búsqueda de socios
+        txtBuscarSocio.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) { filtrar(); }
+            @Override
+            public void removeUpdate(DocumentEvent e) { filtrar(); }
+            @Override
+            public void changedUpdate(DocumentEvent e) { filtrar(); }
+
+            private void filtrar() {
+                String texto = txtBuscarSocio.getText().trim();
+                if (texto.isEmpty()) {
+                    sorterSocios.setRowFilter(null);
+                } else {
+                    // Filtra buscando coincidencia en la columna de Nombre (columna 1)
+                    sorterSocios.setRowFilter(RowFilter.regexFilter("(?i)" + texto, 1));
+                }
+            }
+        });
+
+        // Evento para añadir socios
         btnAgregarSocio.addActionListener(e -> {
             String nombre = txtNombre.getText().trim();
             String email = txtEmail.getText().trim();
@@ -176,7 +252,7 @@ public class VentanaPrincipal extends JFrame {
         panelFormulario.add(new JLabel(" ID Préstamo (solo para devolución):")); panelFormulario.add(txtIdPrestamoDevolucion);
         panelFormulario.add(btnPrestar); panelFormulario.add(btnDevolver);
 
-        // Tabla de Historial Inferior (Préstamos Activos con JOIN de nombres)
+        // Tabla de Historial Inferior
         JPanel panelTabla = new JPanel(new BorderLayout());
         panelTabla.setBorder(BorderFactory.createTitledBorder("Libros actualmente prestados"));
         
@@ -188,7 +264,7 @@ public class VentanaPrincipal extends JFrame {
         panel.add(panelFormulario, BorderLayout.NORTH);
         panel.add(panelTabla, BorderLayout.CENTER);
 
-        // Evento para procesar un nuevo préstamo
+        // Evento del botón Prestar
         btnPrestar.addActionListener(e -> {
             try {
                 int idLibro = Integer.parseInt(txtIdLibro.getText().trim());
@@ -196,8 +272,8 @@ public class VentanaPrincipal extends JFrame {
                 
                 if (prestamoDAO.registrarPrestamo(idLibro, idSocio)) {
                     JOptionPane.showMessageDialog(this, "¡Préstamo registrado con éxito! El stock ha disminuido.");
-                    actualizarTabla(); 
-                    actualizarTablaPrestamos(); 
+                    actualizarTabla();
+                    actualizarTablaPrestamos();
                     txtIdLibro.setText(""); txtIdSocio.setText("");
                 } else {
                     JOptionPane.showMessageDialog(this, "No se pudo realizar el préstamo. Verifica si hay stock disponible o si los IDs existen.");
@@ -207,16 +283,16 @@ public class VentanaPrincipal extends JFrame {
             }
         });
 
-        // Evento para procesar una devolución
+        // Evento del botón Devolver
         btnDevolver.addActionListener(e -> {
             try {
                 int idPrestamo = Integer.parseInt(txtIdPrestamoDevolucion.getText().trim());
-                int idLibro = Integer.parseInt(txtIdLibro.getText().trim()); 
+                int idLibro = Integer.parseInt(txtIdLibro.getText().trim());
                 
                 if (prestamoDAO.registrarDevolucion(idPrestamo, idLibro)) {
                     JOptionPane.showMessageDialog(this, "¡Devolución registrada con éxito! El libro vuelve a estar disponible.");
-                    actualizarTabla(); 
-                    actualizarTablaPrestamos(); 
+                    actualizarTabla();
+                    actualizarTablaPrestamos();
                     txtIdPrestamoDevolucion.setText(""); txtIdLibro.setText("");
                 } else {
                     JOptionPane.showMessageDialog(this, "Error al registrar la devolución. Verifica el ID del préstamo.");
@@ -261,7 +337,7 @@ public class VentanaPrincipal extends JFrame {
      */
     public static void main(String[] args) {
         try {
-            // Activamos el tema moderno oscuro (puedes cambiarlo por FlatLightLaf para tema claro)
+            // Activamos el tema moderno oscuro de FlatLaf
             com.formdev.flatlaf.FlatDarkLaf.setup();
         } catch (Exception ex) {
             System.err.println("No se pudo inicializar el estilo moderno. Usando por defecto.");
