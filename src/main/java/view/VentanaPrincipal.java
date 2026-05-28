@@ -284,22 +284,81 @@ public class VentanaPrincipal extends JFrame {
         panel.add(panelFormulario, BorderLayout.NORTH);
         panel.add(panelTabla, BorderLayout.CENTER);
 
-        // Evento del botón Prestar
+        // Evento del botón Prestar (Con reglas de negocio incorporadas)
         btnPrestar.addActionListener(e -> {
             try {
-                int idLibro = Integer.parseInt(txtIdLibro.getText().trim());
-                int idSocio = Integer.parseInt(txtIdSocio.getText().trim());
+                // 1. Validar que los campos no estén vacíos
+                String txtLibro = txtIdLibro.getText().trim();
+                String txtSocio = txtIdSocio.getText().trim();
                 
+                if (txtLibro.isEmpty() || txtSocio.isEmpty()) {
+                    JOptionPane.showMessageDialog(this, "Por favor, complete los campos 'ID Libro' e 'ID Socio'.", "Campos Incompletos", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+
+                int idLibro = Integer.parseInt(txtLibro);
+                int idSocio = Integer.parseInt(txtSocio);
+                
+                // 2. CAPA DE VALIDACIÓN 1: ¿Existe el Socio en la base de datos?
+                // Reutilizamos el buscarSocio o listar para verificar existencia
+                model.Socio socioExistente = socioDAO.listarSocios().stream()
+                        .filter(s -> s.getIdSocio() == idSocio)
+                        .findFirst()
+                        .orElse(null);
+
+                if (socioExistente == null) {
+                    JOptionPane.showMessageDialog(this, "El ID de Socio ingresado (" + idSocio + ") NO existe en el sistema.", "Socio No Encontrado", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                // 3. CAPA DE VALIDACIÓN 2: ¿Existe el Libro y tiene Stock Disponible?
+                model.Libro libroExistente = libroDAO.listarLibros().stream()
+                        .filter(l -> l.getIdLibro() == idLibro)
+                        .findFirst()
+                        .orElse(null);
+
+                if (libroExistente == null) {
+                    JOptionPane.showMessageDialog(this, "El ID de Libro ingresado (" + idLibro + ") NO existe en el inventario.", "Libro No Encontrado", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                if (libroExistente.getDisponible() == 0) {
+                    JOptionPane.showMessageDialog(this, "El libro '" + libroExistente.getTitulo() + "' ya se encuentra prestado y NO tiene stock disponible.", "Sin Stock", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+
+                // 4. CAPA DE VALIDACIÓN 3: ¿El socio superó el límite máximo de préstamos activos?
+                // Contamos cuántos préstamos activos tiene el socio actual en la lista
+                long prestamosActivosDelSocio = prestamoDAO.listarPrestamosActivos().stream()
+                        .filter(fila -> fila[2] != null && fila[2].toString().equalsIgnoreCase(socioExistente.getNombre()))
+                        .count();
+
+                int limiteMaximo = 3; // Puedes cambiar este número según las reglas de tu biblioteca
+                if (prestamosActivosDelSocio >= limiteMaximo) {
+                    JOptionPane.showMessageDialog(this, 
+                        "Préstamo Denegado:\nEl socio " + socioExistente.getNombre() + " ya posee " + prestamosActivosDelSocio + " libros sin devolver.\nSaldar deudas antes de retirar otro.", 
+                        "Límite de Préstamos Superado", 
+                        JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+
+                // 5. Si superó todas las validaciones, procedemos a realizar la transacción en MySQL
                 if (prestamoDAO.registrarPrestamo(idLibro, idSocio)) {
-                    JOptionPane.showMessageDialog(this, "¡Préstamo registrado con éxito! El stock ha disminuido.");
+                    JOptionPane.showMessageDialog(this, "¡Préstamo registrado con éxito!\nLibro entregado a: " + socioExistente.getNombre(), "Transacción Exitosa", JOptionPane.INFORMATION_MESSAGE);
+                    
+                    // Actualizar las tablas visuales de inmediato
                     actualizarTabla();
                     actualizarTablaPrestamos();
-                    txtIdLibro.setText(""); txtIdSocio.setText("");
+                    
+                    // Limpiar las cajas de texto
+                    txtIdLibro.setText(""); 
+                    txtIdSocio.setText("");
                 } else {
-                    JOptionPane.showMessageDialog(this, "No se pudo realizar el préstamo. Verifica si hay stock disponible o si los IDs existen.");
+                    JOptionPane.showMessageDialog(this, "Hubo un error inesperado en la base de datos al registrar el préstamo.", "Error Interno", JOptionPane.ERROR_MESSAGE);
                 }
+
             } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(this, "Por favor, ingresa IDs numéricos válidos en los campos de préstamo.");
+                JOptionPane.showMessageDialog(this, "Los campos de ID deben contener únicamente valores numéricos enteros.", "Error de Formato", JOptionPane.ERROR_MESSAGE);
             }
         });
 
