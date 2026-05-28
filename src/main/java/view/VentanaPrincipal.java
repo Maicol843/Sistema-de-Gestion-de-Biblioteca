@@ -54,8 +54,10 @@ public class VentanaPrincipal extends JFrame {
     private JPanel crearPanelLibros() {
         JPanel panel = new JPanel(new BorderLayout());
 
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); 
+
         // Formulario superior para añadir libros
-        JPanel panelFormulario = new JPanel(new GridLayout(4, 2, 5, 5));
+        JPanel panelFormulario = new JPanel(new GridLayout(4, 2, 8, 8)); // Aumentamos espacio entre componentes
         panelFormulario.setBorder(BorderFactory.createTitledBorder("Registrar Nuevo Libro"));
         
         JTextField txtTitulo = new JTextField();
@@ -104,9 +106,10 @@ public class VentanaPrincipal extends JFrame {
      */
     private JPanel crearPanelSocios() {
         JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         // Formulario superior para añadir socios
-        JPanel panelFormulario = new JPanel(new GridLayout(4, 2, 5, 5));
+        JPanel panelFormulario = new JPanel(new GridLayout(4, 2, 8, 8));
         panelFormulario.setBorder(BorderFactory.createTitledBorder("Registrar Nuevo Socio"));
         
         JTextField txtNombre = new JTextField();
@@ -155,9 +158,10 @@ public class VentanaPrincipal extends JFrame {
      */
     private JPanel crearPanelPrestamos() {
         JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         // Formulario de operaciones de Préstamos (Superior)
-        JPanel panelFormulario = new JPanel(new GridLayout(4, 2, 5, 5));
+        JPanel panelFormulario = new JPanel(new GridLayout(4, 2, 8, 8));
         panelFormulario.setBorder(BorderFactory.createTitledBorder("Registrar Préstamo / Devolución"));
         
         JTextField txtIdLibro = new JTextField();
