@@ -256,6 +256,13 @@ public class VentanaPrincipal extends JFrame {
      * MÉTODO DE ENTRADA PRINCIPAL
      */
     public static void main(String[] args) {
+        try {
+            // Activamos el tema moderno oscuro (puedes cambiarlo por FlatLightLaf para tema claro)
+            com.formdev.flatlaf.FlatDarkLaf.setup();
+        } catch (Exception ex) {
+            System.err.println("No se pudo inicializar el estilo moderno. Usando por defecto.");
+        }
+
         SwingUtilities.invokeLater(() -> new VentanaPrincipal().setVisible(true));
     }
 }
