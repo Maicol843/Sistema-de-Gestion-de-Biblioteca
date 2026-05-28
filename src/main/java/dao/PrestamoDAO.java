@@ -1,8 +1,9 @@
 package dao;
 
-import config.DatabaseConfig;
 import java.sql.*;
 import java.time.LocalDate;
+
+import config.DatabaseConfig;
 
 public class PrestamoDAO {
 
