@@ -23,7 +23,7 @@ public class VentanaPrincipal extends JFrame {
         // Panel de Libros
         pestañas.addTab("Inventario de Libros", crearPanelLibros());
         // Panel de Préstamos (puedes expandirlo de forma similar)
-        pestañas.addTab("Préstamos y Devoluciones", new JPanel()); 
+        pestañas.addTab("Préstamos y Devoluciones", crearPanelPrestamos());
 
         add(pestañas);
         actualizarTabla();
@@ -69,6 +69,69 @@ public class VentanaPrincipal extends JFrame {
                 }
             } else {
                 JOptionPane.showMessageDialog(this, "Por favor, llene todos los campos.");
+            }
+        });
+
+        return panel;
+    }
+
+    private JPanel crearPanelPrestamos() {
+        JPanel panel = new JPanel(new BorderLayout());
+        dao.PrestamoDAO prestamoDAO = new dao.PrestamoDAO();
+
+        // Formulario de Préstamos
+        JPanel panelFormulario = new JPanel(new GridLayout(4, 2, 5, 5));
+        panelFormulario.setBorder(BorderFactory.createTitledBorder("Registrar Préstamo / Devolución"));
+        
+        JTextField txtIdLibro = new JTextField();
+        JTextField txtIdSocio = new JTextField();
+        JTextField txtIdPrestamoDevolucion = new JTextField();
+        
+        JButton btnPrestar = new JButton("Registrar Préstamo");
+        JButton btnDevolver = new JButton("Registrar Devolución");
+
+        // Sección Préstamo
+        panelFormulario.add(new JLabel(" ID Libro (para prestar):")); panelFormulario.add(txtIdLibro);
+        panelFormulario.add(new JLabel(" ID Socio (para prestar):")); panelFormulario.add(txtIdSocio);
+        panelFormulario.add(new JLabel(" ID Préstamo (solo para devolución):")); panelFormulario.add(txtIdPrestamoDevolucion);
+        panelFormulario.add(btnPrestar); panelFormulario.add(btnDevolver);
+
+        panel.add(panelFormulario, BorderLayout.NORTH);
+
+        // Evento del botón Prestar
+        btnPrestar.addActionListener(e -> {
+            try {
+                int idLibro = Integer.parseInt(txtIdLibro.getText());
+                int idSocio = Integer.parseInt(txtIdSocio.getText());
+                
+                if (prestamoDAO.registrarPrestamo(idLibro, idSocio)) {
+                    JOptionPane.showMessageDialog(this, "¡Préstamo registrado con éxito! El stock del libro ha disminuido.");
+                    actualizarTabla(); // Actualiza el stock en la otra pestaña
+                    txtIdLibro.setText(""); txtIdSocio.setText("");
+                } else {
+                    JOptionPane.showMessageDialog(this, "No se pudo realizar el préstamo. Verifica si el libro tiene copias disponibles.");
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Por favor, ingresa IDs numéricos válidos.");
+            }
+        });
+
+        // Evento del botón Devolver
+        btnDevolver.addActionListener(e -> {
+            try {
+                int idPrestamo = Integer.parseInt(txtIdPrestamoDevolucion.getText());
+                // Para simplificar la interfaz, pediremos el ID del libro en el cuadro de arriba para saber a cuál sumarle stock
+                int idLibro = Integer.parseInt(txtIdLibro.getText()); 
+                
+                if (prestamoDAO.registrarDevolucion(idPrestamo, idLibro)) {
+                    JOptionPane.showMessageDialog(this, "¡Devolución registrada! El libro vuelve a estar disponible.");
+                    actualizarTabla();
+                    txtIdPrestamoDevolucion.setText(""); txtIdLibro.setText("");
+                } else {
+                    JOptionPane.showMessageDialog(this, "Error al registrar la devolución.");
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Completa el ID del Préstamo y el ID del Libro para devolver.");
             }
         });
 
