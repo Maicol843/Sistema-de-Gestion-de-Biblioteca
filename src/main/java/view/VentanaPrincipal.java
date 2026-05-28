@@ -9,8 +9,19 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableRowSorter;
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.GridLayout;
+import java.awt.FlowLayout;
 import java.util.List;
+
+import com.itextpdf.text.*;
+import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
+import java.io.FileOutputStream;
+import java.io.File;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class VentanaPrincipal extends JFrame {
     // Instancias de acceso a datos (DAO)
@@ -21,12 +32,12 @@ public class VentanaPrincipal extends JFrame {
     // Componentes de la tabla de Libros
     private JTable tablaLibros;
     private DefaultTableModel modeloTabla;
-    private TableRowSorter<DefaultTableModel> sorterLibros; // Sorter para filtrar libros
+    private TableRowSorter<DefaultTableModel> sorterLibros; 
 
     // Componentes de la tabla de Socios
     private JTable tablaSocios;
     private DefaultTableModel modeloTablaSocios;
-    private TableRowSorter<DefaultTableModel> sorterSocios; // Sorter para filtrar socios
+    private TableRowSorter<DefaultTableModel> sorterSocios; 
 
     // Componentes de la tabla de Préstamos
     private JTable tablaPrestamos;
@@ -112,7 +123,6 @@ public class VentanaPrincipal extends JFrame {
                 if (texto.isEmpty()) {
                     sorterLibros.setRowFilter(null);
                 } else {
-                    // Filtra de manera insensible a mayúsculas (?i) buscando coincidencia en Título (columna 1) o Autor (columna 2)
                     sorterLibros.setRowFilter(RowFilter.regexFilter("(?i)" + texto, 1, 2));
                 }
             }
@@ -200,7 +210,6 @@ public class VentanaPrincipal extends JFrame {
                 if (texto.isEmpty()) {
                     sorterSocios.setRowFilter(null);
                 } else {
-                    // Filtra buscando coincidencia en la columna de Nombre (columna 1)
                     sorterSocios.setRowFilter(RowFilter.regexFilter("(?i)" + texto, 1));
                 }
             }
@@ -261,6 +270,17 @@ public class VentanaPrincipal extends JFrame {
         JScrollPane scrollTabla = new JScrollPane(tablaPrestamos);
         panelTabla.add(scrollTabla, BorderLayout.CENTER);
 
+        // Botón de exportación a PDF (Especificamos java.awt.Font para evitar el choque)
+        JButton btnExportarPDF = new JButton("Exportar Reporte en PDF");
+        btnExportarPDF.setFont(new java.awt.Font("Helvetica", java.awt.Font.BOLD, 12));
+        
+        JPanel panelBotonPDF = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        panelBotonPDF.add(btnExportarPDF);
+        panelTabla.add(panelBotonPDF, BorderLayout.SOUTH); 
+
+        // Evento para gatillar la creación del PDF al hacer clic
+        btnExportarPDF.addActionListener(e -> exportarReportePDF());
+
         panel.add(panelFormulario, BorderLayout.NORTH);
         panel.add(panelTabla, BorderLayout.CENTER);
 
@@ -306,7 +326,7 @@ public class VentanaPrincipal extends JFrame {
     }   
 
     /**
-     * MÉTODOS DE ACTUALIZACIÓN DE DATOS (Sincronizan base de datos -> JTables)
+     * MÉTODOS DE ACTUALIZACIÓN DE DATOS
      */
     private void actualizarTabla() {
         modeloTabla.setRowCount(0);
@@ -332,12 +352,127 @@ public class VentanaPrincipal extends JFrame {
         }
     }
 
-    /**
-     * MÉTODO DE ENTRADA PRINCIPAL
-     */
+    private void exportarReportePDF() {
+        // 1. Obtener los préstamos activos desde el DAO
+        List<Object[]> prestamosActivos = prestamoDAO.listarPrestamosActivos();
+
+        if (prestamosActivos.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No hay préstamos activos en este momento para exportar.", "Reporte Vacío", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        // 2. Usar JFileChooser para que el usuario elija dónde guardar el archivo de forma segura
+        JFileChooser selectorArchivos = new JFileChooser();
+        selectorArchivos.setDialogTitle("Seleccione dónde guardar el Reporte PDF");
+        // Sugerimos un nombre por defecto
+        selectorArchivos.setSelectedFile(new File("Reporte_Prestamos_Activos.pdf"));
+
+        int seleccion = selectorArchivos.showSaveDialog(this);
+
+        // Si el usuario cancela o cierra la ventana, detenemos el proceso
+        if (seleccion != JFileChooser.APPROVE_OPTION) {
+            return; 
+        }
+
+        // Obtenemos el archivo seleccionado por el usuario
+        File archivoDestino = selectorArchivos.getSelectedFile();
+        String rutaCompleta = archivoDestino.getAbsolutePath();
+
+        // Asegurar que termine en .pdf si el usuario lo borró sin querer
+        if (!rutaCompleta.toLowerCase().endsWith(".pdf")) {
+            rutaCompleta += ".pdf";
+        }
+
+        // 3. Crear el documento PDF utilizando iText
+        Document documento = new Document(PageSize.A4, 36, 36, 54, 36); 
+
+        try {
+            PdfWriter.getInstance(documento, new FileOutputStream(rutaCompleta));
+            documento.open();
+
+            // --- DISEÑO Y ESTILOS DEL PDF ---
+            com.itextpdf.text.Font fuenteTitulo = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 22, com.itextpdf.text.Font.BOLD, new BaseColor(41, 128, 185)); 
+            com.itextpdf.text.Font fuenteSubtitulo = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 10, com.itextpdf.text.Font.ITALIC, BaseColor.GRAY);
+            com.itextpdf.text.Font fuenteTexto = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 11, com.itextpdf.text.Font.NORMAL, BaseColor.BLACK);
+            com.itextpdf.text.Font fuenteEncabezadoTabla = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 11, com.itextpdf.text.Font.BOLD, BaseColor.WHITE);
+
+            // Encabezado del Reporte
+            Paragraph titulo = new Paragraph("SISTEMA DE GESTIÓN DE BIBLIOTECA", fuenteTitulo);
+            titulo.setAlignment(Element.ALIGN_CENTER);
+            documento.add(titulo);
+
+            Paragraph reporteNombre = new Paragraph("Reporte de Préstamos Activos y Deudas", new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 14, com.itextpdf.text.Font.BOLD, BaseColor.DARK_GRAY));
+            reporteNombre.setAlignment(Element.ALIGN_CENTER);
+            reporteNombre.setSpacingBefore(5);
+            documento.add(reporteNombre);
+
+            // Fecha y hora de emisión automática
+            DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+            Paragraph fecha = new Paragraph("Generado el: " + dtf.format(LocalDateTime.now()), fuenteSubtitulo);
+            fecha.setAlignment(Element.ALIGN_CENTER);
+            fecha.setSpacingAfter(20);
+            documento.add(fecha);
+
+            // Línea divisoria decorativa
+            documento.add(new Paragraph(new Chunk(new com.itextpdf.text.pdf.draw.LineSeparator(1f, 100f, new BaseColor(210, 215, 223), Element.ALIGN_CENTER, -1))));
+            documento.add(new Paragraph(" ")); 
+
+            // 4. Estructura de la Tabla en el PDF
+            PdfPTable tablaPDF = new PdfPTable(4);
+            tablaPDF.setWidthPercentage(100); 
+            tablaPDF.setWidths(new float[]{1.5f, 4f, 4f, 2.5f}); 
+
+            String[] encabezados = {"ID Préstamo", "Libro Prestado", "Socio / Deudor", "Fecha de Préstamo"};
+            BaseColor colorFondoEncabezado = new BaseColor(44, 62, 80); 
+
+            for (String enc : encabezados) {
+                PdfPCell celdaEncabezado = new PdfPCell(new Phrase(enc, fuenteEncabezadoTabla));
+                celdaEncabezado.setBackgroundColor(colorFondoEncabezado);
+                celdaEncabezado.setHorizontalAlignment(Element.ALIGN_CENTER);
+                celdaEncabezado.setPadding(8);
+                tablaPDF.addCell(celdaEncabezado);
+            }
+
+            // 5. Inyectar las filas dinámicamente desde la consulta SQL
+            boolean filaAlterna = false;
+            BaseColor colorFilaAlterna = new BaseColor(245, 247, 250); 
+
+            for (Object[] filaData : prestamosActivos) {
+                for (int i = 0; i < 4; i++) {
+                    String dato = (filaData[i] != null) ? filaData[i].toString() : "";
+                    PdfPCell celda = new PdfPCell(new Phrase(dato, fuenteTexto));
+                    
+                    if (i == 0 || i == 3) {
+                        celda.setHorizontalAlignment(Element.ALIGN_CENTER);
+                    } else {
+                        celda.setHorizontalAlignment(Element.ALIGN_LEFT);
+                    }
+                    
+                    celda.setPadding(6);
+
+                    if (filaAlterna) {
+                        celda.setBackgroundColor(colorFilaAlterna);
+                    }
+                    
+                    tablaPDF.addCell(celda);
+                }
+                filaAlterna = !filaAlterna;
+            }
+
+            documento.add(tablaPDF);
+            documento.close();
+
+            // 6. Confirmación al usuario utilizando el nombre real del archivo final
+            JOptionPane.showMessageDialog(this, "¡Reporte PDF generado con éxito!\nGuardado en:\n" + rutaCompleta, "Exportación Exitosa", JOptionPane.INFORMATION_MESSAGE);
+
+        } catch (DocumentException | java.io.FileNotFoundException ex) {
+            JOptionPane.showMessageDialog(this, "Error al generar el PDF: " + ex.getMessage(), "Error de Exportación", JOptionPane.ERROR_MESSAGE);
+            ex.printStackTrace();
+        }
+    }
+
     public static void main(String[] args) {
         try {
-            // Activamos el tema moderno oscuro de FlatLaf
             com.formdev.flatlaf.FlatDarkLaf.setup();
         } catch (Exception ex) {
             System.err.println("No se pudo inicializar el estilo moderno. Usando por defecto.");
