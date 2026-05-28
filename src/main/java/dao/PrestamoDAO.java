@@ -81,4 +81,31 @@ public class PrestamoDAO {
             if (conn != null) { try { conn.close(); } catch (SQLException e) { e.printStackTrace(); } }
         }
     }
+
+    public java.util.List<Object[]> listarPrestamosActivos() {
+        java.util.List<Object[]> lista = new java.util.ArrayList<>();
+        // Consulta que junta las 3 tablas para traer nombres en vez de solo números
+        String sql = "SELECT p.id_prestamo, l.titulo, s.nombre, p.fecha_prestamo " +
+                    "FROM prestamos p " +
+                    "JOIN libros l ON p.id_libro = l.id_libro " +
+                    "JOIN socios s ON p.id_socio = s.id_socio " +
+                    "WHERE p.fecha_devolucion IS NULL"; // Solo los que no se han devuelto
+
+        try (Connection conn = config.DatabaseConfig.getConnection();
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(sql)) {
+            
+            while (rs.next()) {
+                lista.add(new Object[]{
+                    rs.getInt("id_prestamo"),
+                    rs.getString("titulo"),
+                    rs.getString("nombre"),
+                    rs.getDate("fecha_prestamo")
+                });
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return lista;
+    }
 }
