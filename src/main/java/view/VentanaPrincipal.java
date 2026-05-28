@@ -1,6 +1,7 @@
 package view;
 import dao.LibroDAO;
 import model.Libro;
+import model.Socio;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -11,6 +12,9 @@ public class VentanaPrincipal extends JFrame {
     private LibroDAO libroDAO = new LibroDAO();
     private JTable tablaLibros;
     private DefaultTableModel modeloTabla;
+    private dao.SocioDAO socioDAO = new dao.SocioDAO();
+    private JTable tablaSocios;
+    private DefaultTableModel modeloTablaSocios;
 
     public VentanaPrincipal() {
         setTitle("Sistema de Gestión de Biblioteca");
@@ -22,11 +26,14 @@ public class VentanaPrincipal extends JFrame {
 
         // Panel de Libros
         pestañas.addTab("Inventario de Libros", crearPanelLibros());
+        // Panel de Socios
+        pestañas.addTab("Gestión de Socios", crearPanelSocios());
         // Panel de Préstamos (puedes expandirlo de forma similar)
         pestañas.addTab("Préstamos y Devoluciones", crearPanelPrestamos());
 
         add(pestañas);
         actualizarTabla();
+        actualizarTablaSocios();
     }
 
     private JPanel crearPanelLibros() {
@@ -148,5 +155,61 @@ public class VentanaPrincipal extends JFrame {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new VentanaPrincipal().setVisible(true));
+    }
+
+    private JPanel crearPanelSocios() {
+        JPanel panel = new JPanel(new BorderLayout());
+
+        // Formulario superior para añadir socios
+        JPanel panelFormulario = new JPanel(new GridLayout(4, 2, 5, 5));
+        panelFormulario.setBorder(BorderFactory.createTitledBorder("Registrar Nuevo Socio"));
+        
+        JTextField txtNombre = new JTextField();
+        JTextField txtEmail = new JTextField();
+        JTextField txtTelefono = new JTextField();
+        JButton btnAgregarSocio = new JButton("Registrar Socio");
+
+        panelFormulario.add(new JLabel(" Nombre Completo:")); panelFormulario.add(txtNombre);
+        panelFormulario.add(new JLabel(" Email:")); panelFormulario.add(txtEmail);
+        panelFormulario.add(new JLabel(" Teléfono:")); panelFormulario.add(txtTelefono);
+        panelFormulario.add(new JLabel("")); panelFormulario.add(btnAgregarSocio);
+
+        // Tabla central para listar socios
+        modeloTablaSocios = new DefaultTableModel(new String[]{"ID Socio", "Nombre", "Email", "Teléfono"}, 0);
+        tablaSocios = new JTable(modeloTablaSocios);
+        JScrollPane scrollTabla = new JScrollPane(tablaSocios);
+
+        panel.add(panelFormulario, BorderLayout.NORTH);
+        panel.add(scrollTabla, BorderLayout.CENTER);
+
+        // Evento del botón registrar socio
+        btnAgregarSocio.addActionListener(e -> {
+            String nombre = txtNombre.getText().trim();
+            String email = txtEmail.getText().trim();
+            String telefono = txtTelefono.getText().trim();
+            
+            if (!nombre.isEmpty() && !email.isEmpty()) {
+                Socio nuevoSocio = new Socio(0, nombre, email, telefono);
+                if (socioDAO.agregarSocio(nuevoSocio)) {
+                    JOptionPane.showMessageDialog(this, "Socio registrado con éxito.");
+                    actualizarTablaSocios();
+                    txtNombre.setText(""); txtEmail.setText(""); txtTelefono.setText("");
+                } else {
+                    JOptionPane.showMessageDialog(this, "Error al registrar el socio. Quizás el email ya existe.");
+                }
+            } else {
+                JOptionPane.showMessageDialog(this, "Por favor, complete al menos Nombre y Email.");
+            }
+        });
+
+        return panel;
+    }
+
+    private void actualizarTablaSocios() {
+        modeloTablaSocios.setRowCount(0);
+        List<Socio> socios = socioDAO.listarSocios();
+        for (Socio s : socios) {
+            modeloTablaSocios.addRow(new Object[]{s.getIdSocio(), s.getNombre(), s.getEmail(), s.getTelefono()});
+        }
     }
 }
