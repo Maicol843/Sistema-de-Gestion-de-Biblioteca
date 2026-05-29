@@ -39,9 +39,10 @@ public class VentanaPrincipal extends JFrame {
     private DefaultTableModel modeloTablaSocios;
     private TableRowSorter<DefaultTableModel> sorterSocios; 
 
-    // Componentes de la tabla de Préstamos
+    // Componentes de la tabla de Préstamos y su nuevo buscador
     private JTable tablaPrestamos;
     private DefaultTableModel modeloTablaPrestamos;
+    private TableRowSorter<DefaultTableModel> sorterPrestamos; // Sorter para préstamos
 
     // Variables de control para saber qué ID se está editando
     private int idLibroSeleccionado = -1;
@@ -49,7 +50,7 @@ public class VentanaPrincipal extends JFrame {
 
     public VentanaPrincipal() {
         setTitle("Sistema de Gestión de Biblioteca");
-        setSize(900, 700);
+        setSize(950, 750); // Incrementado ligeramente para dar espacio al buscador de préstamos
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -340,7 +341,7 @@ public class VentanaPrincipal extends JFrame {
     }
 
     /**
-     * PESTAÑA 3: PRÉSTAMOS Y DEVOLUCIONES
+     * PESTAÑA 3: PRÉSTAMOS Y DEVOLUCIONES 
      */
     private JPanel crearPanelPrestamos() {
         JPanel panel = new JPanel(new BorderLayout());
@@ -361,6 +362,18 @@ public class VentanaPrincipal extends JFrame {
         panelFormulario.add(new JLabel(" ID Préstamo (solo para devolución):")); panelFormulario.add(txtIdPrestamoDevolucion);
         panelFormulario.add(btnPrestar); panelFormulario.add(btnDevolver);
 
+        // Panel de búsqueda específico para los préstamos 
+        JPanel panelBuscarPrestamo = new JPanel(new BorderLayout(5, 5));
+        panelBuscarPrestamo.setBorder(BorderFactory.createTitledBorder("Buscar Préstamo Activo (Filtro en tiempo real)"));
+        JTextField txtBuscarPrestamo = new JTextField();
+        panelBuscarPrestamo.add(new JLabel(" Escribe el Libro o Socio a buscar: "), BorderLayout.WEST);
+        panelBuscarPrestamo.add(txtBuscarPrestamo, BorderLayout.CENTER);
+
+        // Agrupamos el Formulario y el Buscador en un panel contenedor al Norte
+        JPanel panelNortePestaña = new JPanel(new BorderLayout(5, 5));
+        panelNortePestaña.add(panelFormulario, BorderLayout.NORTH);
+        panelNortePestaña.add(panelBuscarPrestamo, BorderLayout.SOUTH);
+
         JPanel panelTabla = new JPanel(new BorderLayout());
         panelTabla.setBorder(BorderFactory.createTitledBorder("Libros actualmente prestados"));
         
@@ -369,15 +382,34 @@ public class VentanaPrincipal extends JFrame {
         JScrollPane scrollTabla = new JScrollPane(tablaPrestamos);
         panelTabla.add(scrollTabla, BorderLayout.CENTER);
 
+        // Sorter y DocumentListener para Préstamos 
+        sorterPrestamos = new TableRowSorter<>(modeloTablaPrestamos);
+        tablaPrestamos.setRowSorter(sorterPrestamos);
+
+        txtBuscarPrestamo.getDocument().addDocumentListener(new DocumentListener() {
+            @Override public void insertUpdate(DocumentEvent e) { filtrar(); }
+            @Override public void removeUpdate(DocumentEvent e) { filtrar(); }
+            @Override public void changedUpdate(DocumentEvent e) { filtrar(); }
+            private void filtrar() {
+                String texto = txtBuscarPrestamo.getText().trim();
+                if (texto.isEmpty()) { 
+                    sorterPrestamos.setRowFilter(null); 
+                } else { 
+                    // Filtra buscando coincidencias en la columna Libro (columna 1) o Socio (columna 2)
+                    sorterPrestamos.setRowFilter(RowFilter.regexFilter("(?i)" + texto, 1, 2)); 
+                }
+            }
+        });
+
         tablaPrestamos.getSelectionModel().addListSelectionListener(e -> {
             int fila = tablaPrestamos.getSelectedRow();
             if (fila != -1) {
-                txtIdPrestamoDevolucion.setText(modeloTablaPrestamos.getValueAt(fila, 0).toString());
+                int filaModelo = tablaPrestamos.convertRowIndexToModel(fila);
+                txtIdPrestamoDevolucion.setText(modeloTablaPrestamos.getValueAt(filaModelo, 0).toString());
             }
         });
 
         JButton btnExportarPDF = new JButton("Exportar Reporte en PDF");
-        // Se usa java.awt.Font de forma explícita para evitar conflicto con iText
         btnExportarPDF.setFont(new java.awt.Font("Helvetica", java.awt.Font.BOLD, 12));
         
         JPanel panelBotonPDF = new JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -386,7 +418,7 @@ public class VentanaPrincipal extends JFrame {
 
         btnExportarPDF.addActionListener(e -> exportarReportePDF());
 
-        panel.add(panelFormulario, BorderLayout.NORTH);
+        panel.add(panelNortePestaña, BorderLayout.NORTH);
         panel.add(panelTabla, BorderLayout.CENTER);
 
         btnPrestar.addActionListener(e -> {
@@ -502,15 +534,18 @@ public class VentanaPrincipal extends JFrame {
         }
     }
 
+    /**
+     * REPORTE PDF UNIFICADO: Lee directamente de las filas visibles del JTable respetando el filtro
+     */
     private void exportarReportePDF() {
-        List<Object[]> prestamosActivos = prestamoDAO.listarPrestamosActivos();
-        if (prestamosActivos.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "No hay préstamos activos.", "Reporte Vacío", JOptionPane.INFORMATION_MESSAGE);
+        int filasVisibles = tablaPrestamos.getRowCount(); // Obtiene las filas filtradas visibles
+        if (filasVisibles == 0) {
+            JOptionPane.showMessageDialog(this, "No hay préstamos visibles en la tabla para exportar.", "Reporte Vacío", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
 
         JFileChooser selectorArchivos = new JFileChooser();
-        selectorArchivos.setSelectedFile(new File("Reporte_Prestamos_Activos.pdf"));
+        selectorArchivos.setSelectedFile(new File("Reporte_Prestamos_Visibles.pdf"));
         if (selectorArchivos.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
 
         String rutaCompleta = selectorArchivos.getSelectedFile().getAbsolutePath();
@@ -521,7 +556,6 @@ public class VentanaPrincipal extends JFrame {
             PdfWriter.getInstance(documento, new FileOutputStream(rutaCompleta));
             documento.open();
 
-            // Uso explícito de com.itextpdf.text.Font para el PDF
             com.itextpdf.text.Font fuenteTitulo = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 22, com.itextpdf.text.Font.BOLD, new BaseColor(41, 128, 185));
             com.itextpdf.text.Font fuenteSubtitulo = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 10, com.itextpdf.text.Font.ITALIC, BaseColor.GRAY);
             com.itextpdf.text.Font fuenteTexto = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 11, com.itextpdf.text.Font.NORMAL, BaseColor.BLACK);
@@ -531,7 +565,7 @@ public class VentanaPrincipal extends JFrame {
             titulo.setAlignment(Element.ALIGN_CENTER);
             documento.add(titulo);
 
-            Paragraph reporteNombre = new Paragraph("Reporte de Préstamos Activos y Deudas", new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 14, com.itextpdf.text.Font.BOLD, BaseColor.DARK_GRAY));
+            Paragraph reporteNombre = new Paragraph("Reporte de Préstamos Activos (Vista Filtrada)", new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 14, com.itextpdf.text.Font.BOLD, BaseColor.DARK_GRAY));
             reporteNombre.setAlignment(Element.ALIGN_CENTER); documento.add(reporteNombre);
 
             DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
@@ -548,10 +582,14 @@ public class VentanaPrincipal extends JFrame {
                 tablaPDF.addCell(celda);
             }
 
-            for (Object[] filaData : prestamosActivos) {
-                for (int i = 0; i < 4; i++) {
-                    PdfPCell celda = new PdfPCell(new Phrase(filaData[i] != null ? filaData[i].toString() : "", fuenteTexto));
-                    celda.setHorizontalAlignment(i == 0 || i == 3 ? Element.ALIGN_CENTER : Element.ALIGN_LEFT);
+            // Recorre exclusivamente las filas visibles de la vista filtrada en pantalla
+            for (int i = 0; i < filasVisibles; i++) {
+                for (int j = 0; j < 4; j++) {
+                    Object valorCelda = tablaPrestamos.getValueAt(i, j); // Lee directamente de la JTable con sorter aplicado
+                    String dato = (valorCelda != null) ? valorCelda.toString() : "";
+                    
+                    PdfPCell celda = new PdfPCell(new Phrase(dato, fuenteTexto));
+                    celda.setHorizontalAlignment(j == 0 || j == 3 ? Element.ALIGN_CENTER : Element.ALIGN_LEFT);
                     celda.setPadding(6);
                     tablaPDF.addCell(celda);
                 }
